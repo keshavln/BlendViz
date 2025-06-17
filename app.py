@@ -13,6 +13,9 @@ from colorsys import rgb_to_hsv, hsv_to_rgb
 
 os.environ["PATH"] = os.getcwd() + "/blender-3.6.0-linux-x64:" + os.environ["PATH"]
 
+os.system('pip install gdown')
+os.system('gdown --id 1E0MFshpgiinCGpmSsMywIV87gkVEEWa6 -O template.blend')
+
 #Demucs Paramters
 
 model = "htdemucs"
