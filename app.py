@@ -93,6 +93,7 @@ vary = 0.14
 flist = ['']*4
 fname = ''
 option = 'man'
+voc = 'Yes'
 
 code = """
 import bpy
@@ -243,7 +244,10 @@ for i in range(dn):
     )
 
 for i in range(vn):
-    bakefunc(vranges, vlist, vpath, i, -5000, 4200)
+    if '{}' == 'Yes':
+        bakefunc(vranges, vlist, vpath, i, -5000, 4200)
+    else:
+        bakefunc(vranges, vlist, ipath, i, -6000, 3000)
 
 for i in range(iN):
     bakefunc(iranges, ilist, ipath, i, -5000, 5500)
@@ -358,6 +362,9 @@ def update_selection(selected):
     global option
     option = selected
 
+def aretherevocals(selected):
+    global voc
+    voc = selected
 
 #Stem splitting
 
@@ -407,28 +414,26 @@ def handle_upload(file, method):
     flist.sort()
 
     with open('blendscript.py', 'w') as f:
-      f.write(code.format(*[flist[0], flist[1], flist[2], flist[3], colorlist, vary, option, fname, fname[:-4]]))
+      f.write(code.format(*[flist[0], flist[1], flist[2], flist[3], colorlist, vary, option, voc, fname, fname[:-4]]))
 
-    os.system("blender-3.6.0-linux-x64/blender -b visualizermodifiedv2.blend --python blendscript.py")
+    os.system("blender-3.6.0-linux-x64/blender -b template.blend --python blendscript.py")
 
     return f'{fname[:-4]}.blend'
 
 
 #Gradio UI
 
-themenigg = gr.themes.Ocean(
+modifiedocean = gr.themes.Ocean(
     neutral_hue="zinc",
     text_size=gr.themes.Size(lg="24px", md="18px", sm="10px", xl="30px", xs="12px", xxl="40px", xxs="10px"),
     spacing_size="lg",
-    radius_size=gr.themes.Size(lg="20px", md="20px", sm="20px", xl="20px", xs="20px", xxl="20px", xxs="20px")
+    radius_size=gr.themes.Size(lg="20px", md="20px", sm="20px", xl="20px", xs="20px", xxl="20px", xxs="10px")
 
 ).set(
     button_primary_background_fill='linear-gradient(120deg, *secondary_600 0%, *primary_100 60%, *primary_200 100%)',
     button_large_radius='*radius_xxl',
+    block_radius = '*radius_xxs',
     button_large_text_size='*text_md')
-
-
-option = 'man'
 
 css_reset = """
 <style>
@@ -457,10 +462,10 @@ css_reset = """
 </style>
 """
 
-demo = gr.Blocks(theme=themenigg)
+demo = gr.Blocks(theme=modifiedocean)
 with demo:
   gr.HTML(css_reset)
-  gr.Markdown("# Experience Your Music.")
+  gr.Markdown("# BlendViz: Experience Your Music.")
   gr.Markdown("You are about to create a three dimensional music visualizer powered by Demucs for stem splitting and Blender for visualization. Upload an mp3 file of choice below, set your desired color, choose your center object and click on Generate. The movement and intensities of the lights will be tailored to your song. Once done, the blender file of the visualiser can be downloaded. You may play around with the blender project if you wish, or simply press Render Animation to obtain the final mp4. You can set your desired resolution in Output Properties. Please note that **you must have Blender installed** to be able to open the file.")
   #gr.Markdown()
   with gr.Row():
@@ -485,6 +490,9 @@ with demo:
       radio = gr.Radio(choices, label='', value='man')
       radio.change(fn=update_selection, inputs=radio)
   with gr.Row():
+    vocradio = gr.Radio(['Yes', 'No'], label = 'Do vocals play a significant role in your song? If unsure, select No.', value='Yes')
+    vocradio.change(fn=aretherevocals, inputs=vocradio)
+  with gr.Row():
     with gr.Column():
       with gr.Tab('mp3'):
         audio_input = gr.File(label="Upload audio", type="filepath")
@@ -495,6 +503,7 @@ with demo:
     with gr.Column():
       output_download = gr.File(label="Download visualizer", elem_id = 'filedownload')
 
+  gr.Markdown("*(If downloading the final blender file takes too long, download directly from the colab notebook.)*")  
   color.change(update_color_blocks, inputs=[color, slider], outputs=output)
   slider.change(update_color_blocks, inputs=[color, slider], outputs=output)
   #split_btn = gr.Button("Generate")
