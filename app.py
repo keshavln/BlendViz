@@ -513,4 +513,4 @@ with demo:
   split_btn.click(fn=lambda val: handle_upload(val, 'mp3'), inputs=audio_input, outputs=output_download)
   yt_btn.click(fn=lambda val2: handle_upload(val2, 'link'), inputs=yt_input, outputs=output_download)
 
-demo.launch()
+demo.launch(share=True)
