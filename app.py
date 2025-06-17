@@ -385,12 +385,12 @@ def handle_upload(file, method):
     flist = []
 
     if method == 'mp3':
-      fnamewpath = file.name
+        fnamewpath = file.name
     elif method == 'link':
-        os.system('yt-dlp -x --audio-format mp3 "{file}"')
+        os.system(f'yt-dlp -x --audio-format mp3 "{file}"')
         result = subprocess.run(["yt-dlp", "-x", "--audio-format", "mp3", "--print", f"%(title)s [{file[-11:]}].mp3", file],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
         fnamewpath = result.stdout.strip()
-        fnamewpath = '/content/' + fnamewpath
+        fnamewpath = '/content/BlendViz/' + fnamewpath
         #fnamewpath = os.path.abspath(filename)
 
     fname = fnamewpath[::-1].partition('/')[0][::-1]
