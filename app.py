@@ -473,7 +473,7 @@ demo = gr.Blocks(theme=modifiedocean)
 with demo:
   gr.HTML(css_reset)
   gr.Markdown("# BlendViz: Experience Your Music.")
-  gr.Markdown("You are about to create a three dimensional music visualizer powered by Demucs for stem splitting and Blender for visualization. Choose a song either by uploading an mp3 file or by pasting a Youtube link, set your desired color, choose your center object and click on Generate. The movement and intensities of the lights will be tailored to your song. Once done, the blender file of the visualiser can be downloaded. Refer to the file itself for further instructions. Please note that **you must have Blender installed** to be able to open the file. Generation will take 2-3 minutes on Colab's T4 GPU.")
+  gr.Markdown("You are about to create a three dimensional music visualizer powered by Demucs for stem splitting and Blender for visualization. Choose a song either by uploading an mp3 file or by pasting a Youtube link. Set your desired color, choose your center object and click on Generate. Once done, the blender file of the visualiser can be downloaded. Refer to the file itself for further instructions. Please note that **you must have Blender installed** to be able to open the file. Generation will take 2-3 minutes on Colab's T4 GPU.")
   #gr.Markdown()
   with gr.Row():
     with gr.Column():
