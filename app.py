@@ -290,7 +290,7 @@ for strip in sequences:
 
 
 
-bpy.ops.wm.save_as_mainfile(filepath='/content/BlendViz/{}.blend')
+bpy.ops.wm.save_as_mainfile(filepath='/content/BlendViz/download/{}.blend')
 """
 
 #Color and center object selection
@@ -382,6 +382,7 @@ def handle_upload(file, method):
     global flist, fname, vary, option
     in_path = Path("tmp_in")
     out_path = Path("separated")
+    blend_path = Path("/content/BlendViz/download")
     flist = []
 
     if method == 'mp3':
@@ -402,6 +403,10 @@ def handle_upload(file, method):
         rmtree(out_path)
     out_path.mkdir()
 
+    if blend_path.exists():
+        rmtree(blend_path)
+    blend_path.mkdir()
+
     # Copy uploaded file into input folder expected by your demucs runner
     target_path = in_path / fnamewpath.name
     print(target_path)
@@ -419,7 +424,7 @@ def handle_upload(file, method):
 
     os.system("blender-3.6.0-linux-x64/blender -b template.blend --python blendscript.py")
 
-    return f'/content/BlendViz/{fname[:-4]}.blend'
+    return f'/content/BlendViz/download/{fname[:-4]}.blend'
 
 
 #Gradio UI
