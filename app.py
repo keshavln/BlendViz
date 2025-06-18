@@ -424,8 +424,9 @@ def handle_upload(file, method):
 
     os.system("blender-3.6.0-linux-x64/blender -b template.blend --python blendscript.py")
 
-    return f'/content/BlendViz/download/{fname[:-4]}.blend'
-
+    shutil.make_archive('/content/BlendViz/visualizer', 'zip', '/content/BlendViz/download')
+    #return f'/content/BlendViz/download/{fname[:-4]}.blend'
+    return '/content/BlendViz/visualizer.zip'
 
 #Gradio UI
 
