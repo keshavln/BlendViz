@@ -22,5 +22,4 @@ For those interested, local setup of BlendViz is recommended if a CUDA-enabled G
 5. Run ```python app.py``` to launch the interface.
 
 Steps 1-4 above involve initial setup. Once completed, it is enough to run the below two commands whenever using BlendViz in the future:
-```cd BlendViz```
-```python app.py```
+```cd BlendViz\npython app.py```
