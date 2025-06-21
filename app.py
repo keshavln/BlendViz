@@ -10,13 +10,21 @@ import sys
 import subprocess
 from typing import Dict, Tuple, Optional, IO
 from colorsys import rgb_to_hsv, hsv_to_rgb
+import re
+import torch
 
-os.environ["PATH"] = os.getcwd() + "/blender-3.6.0-linux-x64:" + os.environ["PATH"]
+if torch.cuda.is_available():
+  print('Cuda available!')
+else:
+  print('Cuda not available, please check installation.')
 
-os.system('pip install gdown')
-os.system('gdown --id 1E0MFshpgiinCGpmSsMywIV87gkVEEWa6 -O template.blend')
+# --- IMPORTANT: Variables to be changed upon local installation ---
+blenderinstallationpath = r'blender-3.6.0-linux-x64/blender' #Change to your blender installation path.
 
-#Demucs Paramters
+if not os.path.exists('template.blend'):
+  os.system('gdown --id 1E0MFshpgiinCGpmSsMywIV87gkVEEWa6 -O template.blend')
+
+# --- Demucs Setup ---
 
 model = "htdemucs"
 extensions = ["mp3", "wav", "ogg", "flac"]
@@ -29,8 +37,6 @@ int24 = False
 
 filename = ''
 
-#Demucs setup functions
-
 def find_files(in_path):
     out = []
     for file in Path(in_path).iterdir():
@@ -39,36 +45,15 @@ def find_files(in_path):
     return out
 
 def copy_process_streams(process: sp.Popen):
-    def raw(stream: Optional[IO[bytes]]) -> IO[bytes]:
-        assert stream is not None
-        if isinstance(stream, io.BufferedIOBase):
-            stream = stream.raw
-        return stream
-
-    p_stdout, p_stderr = raw(process.stdout), raw(process.stderr)
-    stream_by_fd: Dict[int, Tuple[IO[bytes], io.StringIO, IO[str]]] = {
-        p_stdout.fileno(): (p_stdout, sys.stdout),
-        p_stderr.fileno(): (p_stderr, sys.stderr),
-    }
-    fds = list(stream_by_fd.keys())
-
-    while fds:
-        # `select` syscall will wait until one of the file descriptors has content.
-        ready, _, _ = select.select(fds, [], [])
-        for fd in ready:
-            p_stream, std = stream_by_fd[fd]
-            raw_buf = p_stream.read(2 ** 16)
-            if not raw_buf:
-                fds.remove(fd)
-                continue
-            buf = raw_buf.decode()
-            std.write(buf)
-            std.flush()
+    for line in process.stdout:
+        sys.stdout.write(line.decode())
+    for line in process.stderr:
+        sys.stderr.write(line.decode())
 
 def separate(inp=None, outp=None):
     inp = inp or in_path
     outp = outp or out_path
-    cmd = ["python3", "-m", "demucs.separate", "-o", str(outp), "-n", model]
+    cmd = ["python", "-m", "demucs.separate", "--device", "cuda", "-o", str(outp), "-n", model]
     if mp3:
         cmd += ["--mp3", f"--mp3-bitrate={mp3_rate}"]
     if float32:
@@ -79,18 +64,20 @@ def separate(inp=None, outp=None):
         cmd += [f"--two-stems={two_stems}"]
     files = [str(f) for f in find_files(inp)]
     if not files:
-        print(f"No valid audio files in {in_path}")
+        print(f"No valid audio files")
         return
     print("Going to separate the files:")
     print('\n'.join(files))
     print("With command: ", " ".join(cmd))
-    p = sp.Popen(cmd + files, stdout=sp.PIPE, stderr=sp.PIPE)
-    copy_process_streams(p)
-    p.wait()
-    if p.returncode != 0:
-        print("Command failed, something went wrong.")
+    cmd.append(f'"{files[0]}"')
+    finalcmd = ''
+    for i in cmd:
+       finalcmd += i
+       finalcmd += ' '
+    os.system(finalcmd)
 
-#The script to be run
+# --- The script to be run ---
+
 colorlist = [0,0,0,0]
 vary = 0.14
 flist = ['']*4
@@ -102,25 +89,25 @@ code = """
 import bpy
 import colorsys
 #Bass
-bpath = '{}'
+bpath = r'{}'
 branges = [(20,60), (60,100), (100,200), (60,100)]
 bn = len(branges)
 blist = ['basslight'+str(n) for n in range(1,bn+1)]
 
 #Drums
-dpath = '{}'
+dpath = r'{}'
 dranges = [(20,80), (80,150), (150,250), (250,350), (350,3000), (3000,10000)]
 dn = len(dranges)
 dlist = ['drums'+str(n) for n in range(1,dn+1)]
 
 #Instrumental
-ipath = '{}'
+ipath = r'{}'
 iranges = [(250,350), (350,550), (550,750), (750,1050), (1050,2000), (2000,3000), (3000,10000)]
 iN = len(iranges)
 ilist = ['inst'+str(n) for n in range(1,iN+1)]
 
 #Vocals
-vpath = '{}'
+vpath = r'{}'
 vranges = [(20,250), (250,350), (350,550), (550,750), (750,1050), (1050,2000), (2000,3000), (3000,10000)]
 vn = len(vranges)
 vlist = ['vocals'+str(n) for n in range(1,vn+1)]
@@ -250,7 +237,7 @@ for i in range(vn):
     if '{}' == 'Yes':
         bakefunc(vranges, vlist, vpath, i, -5000, 4200)
     else:
-        bakefunc(vranges, vlist, ipath, i, -6000, 3000)
+        bakefunc(vranges, vlist, ipath, i, -6000, 4200)
 
 for i in range(iN):
     bakefunc(iranges, ilist, ipath, i, -5000, 5500)
@@ -261,7 +248,7 @@ sequencer =  bpy.context.scene.sequence_editor
 for strip in list(sequencer.sequences_all):  # List to avoid mutation issues
         sequencer.sequences.remove(strip)
 
-sound_strip = sequencer.sequences.new_sound(name = 'New1', filepath = 'tmp_in/{}', channel = 1, frame_start = 0)
+sound_strip = sequencer.sequences.new_sound(name = 'New1', filepath = r'{}', channel = 1, frame_start = 0)
 
 bpy.context.scene.frame_end = int(sound_strip.frame_final_duration)
 
@@ -290,10 +277,10 @@ for strip in sequences:
 
 
 
-bpy.ops.wm.save_as_mainfile(filepath='/content/BlendViz/download/{}.blend')
+bpy.ops.wm.save_as_mainfile(filepath=r'{}')
 """
 
-#Color and center object selection
+# --- Color and center object selection ---
 
 
 allblack = ['#000000']*4
@@ -339,12 +326,8 @@ def alter(color, dh, ds, dv, indexx):
     r,g,b = hsv_to_rgb(h,s,v)
 
     colorlist[indexx] = (r*255, g*255, b*255)
-    #hlist[indexx] = h
-    #slist[indexx] = s
-    #vlist[indexx] = v
 
     r,g,b = hsv_to_rgb(h,s,v)
-    #newcode = '#%02x%02x%02x' % (int(r*255), int(g*255), int(b*255))
     return (r*255, g*255, b*255)
 
 def update_color_blocks(c, var):
@@ -369,32 +352,33 @@ def aretherevocals(selected):
     global voc
     voc = selected
 
-#Stem splitting
-
 
 fnamewpath = ''
 def toggle_video(visible):
     return gr.update(visible=not visible), not visible
 
+# --- Handling entire pipeline ---
 def handle_upload(file, method):
     global fnamewpath
-    # file is a Gradio UploadedFile object (e.g. tempfile)
     global flist, fname, vary, option
     in_path = Path("tmp_in")
     out_path = Path("separated")
-    blend_path = Path("/content/BlendViz/download")
+    blend_path = Path("download")
     flist = []
 
     if method == 'mp3':
       fnamewpath = Path(file.name)
     elif method == 'link':
-        os.system(f'yt-dlp -x --audio-format mp3 "{file}"')
         result = subprocess.run(["yt-dlp", "-x", "--audio-format", "mp3", "--print", f"%(title)s [{file[-11:]}].mp3", file],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
-        fname = result.stdout.strip()
-        fnamewpath = Path('/content/BlendViz') / fname
-        #fnamewpath = os.path.abspath(filename)
+        fnamewspecialchars = result.stdout.strip()
+        fname = re.sub(r'[^a-zA-Z0-9]', '', fnamewspecialchars[:-4])
+        fname += '.mp3'
+        execution = f'yt-dlp -o "{fname}" --extract-audio --audio-format mp3 "{file}"'
+        os.system(execution)
+        fnamewpath = Path(os.path.abspath(fname))
+
     fname = fnamewpath.name
-    # Ensure clean dirs
+    
     if in_path.exists():
         rmtree(in_path)
     in_path.mkdir()
@@ -407,12 +391,12 @@ def handle_upload(file, method):
         rmtree(blend_path)
     blend_path.mkdir()
 
-    # Copy uploaded file into input folder expected by your demucs runner
-    target_path = in_path / fnamewpath.name
+    target_path = Path(os.path.abspath(in_path / fnamewpath.name))
     print(target_path)
     shutil.copy(fnamewpath, target_path)
 
-    # Run your original function
+    in_path = Path(os.path.abspath(in_path))
+    out_path = Path(os.path.abspath(out_path))
     separate(in_path, out_path)
 
     for f in out_path.rglob("*.mp3"):
@@ -420,15 +404,14 @@ def handle_upload(file, method):
     flist.sort()
 
     with open('blendscript.py', 'w') as f:
-      f.write(code.format(*[flist[0], flist[1], flist[2], flist[3], colorlist, vary, option, voc, fname, fname[:-4]]))
+      f.write(code.format(*[flist[0], flist[1], flist[2], flist[3], colorlist, vary, option, voc, os.path.abspath(f'tmp_in/{fname}'), str(Path(f'{os.path.abspath("download")}') / Path(f'{fname[:-4]}.blend'))]))#  os.path.abspath(f'{fname[:-4]}.blend')]))
 
-    os.system("blender-3.6.0-linux-x64/blender -b template.blend --python blendscript.py")
+    os.system(fr'"{blenderinstallationpath}" -b template.blend --python blendscript.py')
 
-    shutil.make_archive('/content/BlendViz/visualizer', 'zip', '/content/BlendViz/download')
-    #return f'/content/BlendViz/download/{fname[:-4]}.blend'
-    return '/content/BlendViz/visualizer.zip'
+    shutil.make_archive('visualizer', 'zip', 'download')
+    return 'visualizer.zip'
 
-#Gradio UI
+# --- Gradio UI ---
 
 modifiedocean = gr.themes.Ocean(
     neutral_hue="zinc",
@@ -474,7 +457,6 @@ with demo:
   gr.HTML(css_reset)
   gr.Markdown("# BlendViz: Experience Your Music.")
   gr.Markdown("You are about to create a three dimensional music visualizer powered by Demucs for stem splitting and Blender for visualization. Choose a song either by uploading an mp3 file or by pasting a Youtube link. Set your desired color, choose your center object and click on Generate. Once done, the blender file of the visualiser can be downloaded. Refer to the file itself for further instructions. Please note that **you must have Blender installed** to be able to open the file. Generation will take 2-3 minutes on Colab's T4 GPU.")
-  #gr.Markdown()
   with gr.Row():
     with gr.Column():
       toggle_btn = gr.Button("View Demo")
@@ -510,11 +492,12 @@ with demo:
     with gr.Column():
       output_download = gr.File(label="Download visualizer", elem_id = 'filedownload')
 
-  gr.Markdown("*(If downloading the final blender file takes too long, download directly from the colab notebook.)*")  
+  gr.Markdown("*(If downloading the final blender file takes too long, download directly from the colab notebook. If running locally, the final file is directly accessible.)*")  
   color.change(update_color_blocks, inputs=[color, slider], outputs=output)
   slider.change(update_color_blocks, inputs=[color, slider], outputs=output)
-  #split_btn = gr.Button("Generate")
   split_btn.click(fn=lambda val: handle_upload(val, 'mp3'), inputs=audio_input, outputs=output_download)
   yt_btn.click(fn=lambda val2: handle_upload(val2, 'link'), inputs=yt_input, outputs=output_download)
-
-demo.launch(share=True)
+try:
+    demo.launch(share=True)
+except:
+    demo.launch()
