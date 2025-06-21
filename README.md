@@ -10,7 +10,7 @@ Use BlendViz via the official [Colab notebook](https://colab.research.google.com
 
 ## Local Setup
 
-For those interested, local setup of BlendViz is recommended if a decent GPU is available, especially a CUDA-enabled one. Follow the below steps to run BlendViz locally.
+For those interested, local setup of BlendViz is recommended if a CUDA-enabled GPU is available. Follow the below steps to run BlendViz locally.
 
 1. Clone the repository and set working directory:
    ``` git clone https://github.com/keshavln/BlendViz ```
@@ -19,4 +19,4 @@ For those interested, local setup of BlendViz is recommended if a decent GPU is 
 3. Install dependencies.
    ``` pip install -r requirements.txt ```
 4. Edit the ```blenderinstallationpath``` variable at line 22 of ```app.py``` to store your current Blender installation path. Please note that Blender 4 cannot be used to run BlendViz. However, the output file may be viewed on any version of blender.
-5. Run ``` python app.py``` to launch BlendViz.
+5. The above initial setup only needs to be carried out once. Whenever using BlendViz subsequently, run ``` python app.py``` to launch the interface. Always make sure to set the current directory to the BlendViz folder before doing so.
