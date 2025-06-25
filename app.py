@@ -595,6 +595,7 @@ with demo:
         split_btn = gr.Button("Generate")
       with gr.Tab('link'):
         yt_input = gr.Textbox(label="Paste a youtube link:")
+        gr.Markdown("<small> (May trigger an error if downloads are blocked by Youtube. In that case, please upload an mp3 file.) </small>")
         yt_btn = gr.Button("Generate")
     with gr.Column():
       output_download = gr.File(label="Download visualizer", elem_id = 'filedownload')
