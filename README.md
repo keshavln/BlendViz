@@ -17,7 +17,7 @@ For those interested, local setup of BlendViz is recommended if a CUDA-enabled G
    ``` cd BlendViz ```
 2. Create and activate a virtual environment. Ensure that CUDA is installed and available.
 3. Install dependencies.
-   ``` pip install -r requirements.txt ```\
+   ``` pip install -r requirements.txt ```
 4. Edit the ```blenderinstallationpath``` variable at line 22 of ```app.py``` to store your current Blender installation path. Please note that Blender 4 cannot be used to run BlendViz. However, the output file may be viewed on any version of blender.
 5. Run ```python app.py``` to launch the interface.
 
