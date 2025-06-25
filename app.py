@@ -18,11 +18,12 @@ if torch.cuda.is_available():
 else:
   print('Cuda not available, please check installation.')
 
-# --- IMPORTANT: Variables to be changed upon local installation ---
-blenderinstallationpath = r'blender-3.6.0-linux-x64/blender' #Change to your blender installation path.
-
+# --- IMPORTANT: Variable to be changed upon local installation ---
+blenderinstallationpath = r'blender-3.6.0-linux-x64/blender' # Change to your full blender installation path (make sure it's a raw string)
+#-------------------------------------------------------------------^
 if not os.path.exists('template.blend'):
-  os.system('gdown --id 1E0MFshpgiinCGpmSsMywIV87gkVEEWa6 -O template.blend')
+  os.system('pip install gdown')
+  os.system('gdown --id 1KhTinoIvvYiPYy7VyDMi-R9PikbY9YWW -O template.blend')
 
 # --- Demucs Setup ---
 
@@ -88,6 +89,9 @@ voc = 'Yes'
 code = """
 import bpy
 import colorsys
+import os
+from mathutils import Vector
+
 #Bass
 bpath = r'{}'
 branges = [(20,60), (60,100), (100,200), (60,100)]
@@ -258,15 +262,8 @@ for keyframe in fc.keyframe_points:
     if keyframe.co.x > 1:
         keyframe.co.x = int(sound_strip.frame_final_duration)
         break
-
-'''
-# Reference the latest sound strip
-sound_strip = bpy.context.scene.sequence_editor.sequences_all[-1]
-
-# Pack its audio only
-sound_data = sound_strip.sound
-if sound_data and not sound_data.packed_file:
-    sound_data.pack()'''
+        
+# paste here if something goes wrong
 
 sequences = bpy.context.scene.sequence_editor.sequences_all
 for strip in sequences:
@@ -276,10 +273,90 @@ for strip in sequences:
             sound_data.pack()
 
 
-
-bpy.ops.wm.save_as_mainfile(filepath=r'{}')
 """
+customobjcode = """
+# This part of the code configures a custom center object, if chosen.
 
+bpy.ops.object.select_all(action='DESELECT')
+
+# Config
+customobjpath = r"{}"
+final_name = "usercenterobject"
+floor_z = 1.6
+
+customobjpath = os.path.abspath(customobjpath)
+ext = os.path.splitext(customobjpath)[1].lower()
+
+# Importing 3D file and joining into a single object
+
+if ext == '.obj':
+    bpy.ops.import_scene.obj(filepath=customobjpath)
+elif ext == '.stl':
+    bpy.ops.import_mesh.stl(filepath=customobjpath)
+elif ext == '.fbx':
+    bpy.ops.import_scene.fbx(filepath=customobjpath)
+    
+imported_objs = bpy.context.selected_objects
+bpy.ops.object.select_all(action='DESELECT')
+numparts = 0
+for obj in imported_objs:
+    numparts += 1
+    obj.select_set(True)
+print(numparts)
+bpy.context.view_layer.objects.active = imported_objs[0]
+bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+if numparts > 1:
+    bpy.ops.object.join()
+joined_obj = bpy.context.active_object
+joined_obj.name = final_name
+
+#Positioning and scaling object
+
+min_world_z = min((joined_obj.matrix_world @ v.co).z for v in joined_obj.data.vertices)
+
+delta_z = floor_z - min_world_z
+joined_obj.location.z += delta_z
+
+bpy.ops.object.select_all(action='DESELECT')
+obj = bpy.data.objects[final_name]
+obj.select_set(True)
+bpy.context.view_layer.objects.active = obj
+bpy.ops.object.transform_apply(location=True, rotation=False, scale=False)
+
+target_origin_world = Vector((0, 0, floor_z))
+target_origin_local = joined_obj.matrix_world.inverted() @ target_origin_world
+for v in joined_obj.data.vertices:
+    v.co -= target_origin_local
+joined_obj.location += target_origin_world
+
+bpy.context.view_layer.objects.active = joined_obj
+bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
+
+target_height = 4.49432
+scale_factor = target_height / joined_obj.dimensions.z
+joined_obj.scale *= scale_factor
+
+bpy.ops.object.select_all(action='DESELECT')
+joined_obj.select_set(True)
+bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
+
+if joined_obj.dimensions.y > 10:
+    scale_factor = 10 / joined_obj.dimensions.y
+    joined_obj.scale *= scale_factor
+    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+
+if joined_obj.dimensions.x > 10:
+    scale_factor = 10 / joined_obj.dimensions.x
+    joined_obj.scale *= scale_factor
+    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+
+new_mat = bpy.data.materials.new(name="modify_this_if_you_want")
+new_mat.use_nodes = False
+joined_obj.data.materials.clear()
+joined_obj.data.materials.append(new_mat)
+joined_obj.active_material = new_mat
+
+"""
 # --- Color and center object selection ---
 
 
@@ -342,11 +419,16 @@ def update_color_blocks(c, var):
 
 
 option = 'man'
-choices = ['man', 'dragon', 'knight', 'sword', 'rose', 'suzanne (blender monkey)']
+choices = ['man', 'dragon', 'knight', 'sword', 'rose', 'suzanne (blender monkey)', 'custom']
 
-def update_selection(selected):
+def update_selection(selected, visible):
     global option
+    ogoption = option
     option = selected
+    if selected == 'custom' or ogoption == 'custom':
+        return gr.update(visible=not visible), not visible
+    else:
+        return gr.update(visible=visible), visible
 
 def aretherevocals(selected):
     global voc
@@ -354,21 +436,27 @@ def aretherevocals(selected):
 
 
 fnamewpath = ''
+custommodelpath = ''
 def toggle_video(visible):
     return gr.update(visible=not visible), not visible
 
 # --- Handling entire pipeline ---
-def handle_upload(file, method):
+def handle_upload(file, method, threedpath):
     global fnamewpath
-    global flist, fname, vary, option
+    global flist, fname, vary, option, code, customobjcode
     in_path = Path("tmp_in")
     out_path = Path("separated")
     blend_path = Path("download")
     flist = []
 
+    if option == 'custom':
+       code += customobjcode.format(threedpath.name)
+    code += "\nbpy.ops.wm.save_as_mainfile(filepath=r'{}')\n"
+
     if method == 'mp3':
       fnamewpath = Path(file.name)
     elif method == 'link':
+        file = file.split('&')[0]
         result = subprocess.run(["yt-dlp", "-x", "--audio-format", "mp3", "--print", f"%(title)s [{file[-11:]}].mp3", file],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
         fnamewspecialchars = result.stdout.strip()
         fname = re.sub(r'[^a-zA-Z0-9]', '', fnamewspecialchars[:-4])
@@ -416,9 +504,21 @@ def handle_upload(file, method):
 modifiedocean = gr.themes.Ocean(
     neutral_hue="zinc",
     text_size=gr.themes.Size(lg="24px", md="18px", sm="10px", xl="30px", xs="12px", xxl="40px", xxs="10px"),
-    spacing_size="lg",
+    spacing_size='lg',
     radius_size=gr.themes.Size(lg="20px", md="20px", sm="20px", xl="20px", xs="20px", xxl="20px", xxs="10px")
+).set(
+    button_primary_background_fill='linear-gradient(120deg, *secondary_600 0%, *primary_100 60%, *primary_200 100%)',
+    button_large_radius='*radius_xxl',
+    block_radius = '*radius_xxs',
+    button_large_text_size='*text_md')
 
+modifiedcitrus = gr.themes.Citrus(
+    primary_hue="teal",
+    secondary_hue="emerald",
+    neutral_hue="gray",
+    text_size=gr.themes.Size(lg="24px", md="18px", sm="10px", xl="30px", xs="12px", xxl="40px", xxs="10px"),
+    spacing_size='lg',
+    radius_size=gr.themes.Size(lg="20px", md="20px", sm="20px", xl="20px", xs="20px", xxl="20px", xxs="10px")
 ).set(
     button_primary_background_fill='linear-gradient(120deg, *secondary_600 0%, *primary_100 60%, *primary_200 100%)',
     button_large_radius='*radius_xxl',
@@ -435,9 +535,9 @@ css_reset = """
   }
 
   #root, .gradio-container {
-    margin: 10px 100px 100px 100px !important;  /* top right bottom left */
+    margin: 10px auto auto auto !important;  /* top right bottom left */
     padding: 0 !important;
-    max-width: 100% !important;
+    width: 85% !important;
     box-sizing: border-box;
   }
 
@@ -449,10 +549,13 @@ css_reset = """
   #filedownload {
     margin: 73px 0 0 0 !important;
   }
+  #rounded {
+  border-radius:20px;
+  }
 </style>
 """
 
-demo = gr.Blocks(theme=modifiedocean)
+demo = gr.Blocks(theme=modifiedcitrus)
 with demo:
   gr.HTML(css_reset)
   gr.Markdown("# BlendViz: Experience Your Music.")
@@ -467,7 +570,8 @@ with demo:
       pass
   with gr.Row():
     with gr.Column():
-      gr.Markdown("### Choose a Color")
+     with gr.Group(elem_id='rounded'):
+      gr.Markdown("### <div style = 'text-align:center; padding:15px;'>Choose a Color</div>")
       with gr.Row(scale=1):
         color = gr.ColorPicker(label="Kindly choose at least once to register a color.")
       with gr.Row(scale=1):
@@ -475,10 +579,13 @@ with demo:
       with gr.Row(scale=1):
         output = gr.HTML(html_template.format(*allblack))
     with gr.Column():
-      gr.Markdown("### Choose a Center Object")
-      radio = gr.Radio(choices, label='', value='man')
-      radio.change(fn=update_selection, inputs=radio)
-  with gr.Row():
+     with gr.Group(elem_id='rounded'):
+      gr.Markdown("### <div style = 'text-align:center; padding:15px;'>Choose a Center Object </div>")
+      radio = gr.Radio(choices, label='Choose custom to upload your own 3D model.', value='man')
+      customobj = gr.File(label='Supported formats: .stl, .fbx, .obj ONLY', visible=False)
+      customornot = gr.State(value=False)
+      radio.change(fn=update_selection, inputs=[radio, customornot], outputs=[customobj, customornot])
+  with gr.Group(elem_id = 'rounded'):
     vocradio = gr.Radio(['Yes', 'No'], label = 'Do vocals play a significant role in your song? If unsure, select No.', value='Yes')
     vocradio.change(fn=aretherevocals, inputs=vocradio)
   with gr.Row():
@@ -495,9 +602,9 @@ with demo:
   gr.Markdown("*(If downloading the final blender file takes too long, download directly from the colab notebook. If running locally, the final file is directly accessible.)*")  
   color.change(update_color_blocks, inputs=[color, slider], outputs=output)
   slider.change(update_color_blocks, inputs=[color, slider], outputs=output)
-  split_btn.click(fn=lambda val: handle_upload(val, 'mp3'), inputs=audio_input, outputs=output_download)
-  yt_btn.click(fn=lambda val2: handle_upload(val2, 'link'), inputs=yt_input, outputs=output_download)
+  split_btn.click(fn=lambda val, objfile: handle_upload(val, 'mp3', objfile), inputs=[audio_input, customobj], outputs=output_download)
+  yt_btn.click(fn=lambda val2, objfile: handle_upload(val2, 'link', objfile), inputs=[yt_input, customobj], outputs=output_download)
 try:
-    demo.launch(share=True)
+  demo.launch(share=True)
 except:
-    demo.launch()
+  demo.launch()
