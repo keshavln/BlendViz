@@ -552,6 +552,14 @@ css_reset = """
   #rounded {
   border-radius:20px;
   }
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+body, #root, .gradio-container {
+  animation: fadeIn 1s ease-in-out;
+}
 </style>
 """
 
@@ -595,7 +603,7 @@ with demo:
         split_btn = gr.Button("Generate")
       with gr.Tab('link'):
         yt_input = gr.Textbox(label="Paste a youtube link:")
-        gr.Markdown("<small> (May trigger an error if downloads are blocked by Youtube. In that case, please upload an mp3 file.) </small>")
+        gr.Markdown("*(May trigger an error if downloads are blocked by Youtube. In that case, please upload an mp3 file.)*")
         yt_btn = gr.Button("Generate")
     with gr.Column():
       output_download = gr.File(label="Download visualizer", elem_id = 'filedownload')
