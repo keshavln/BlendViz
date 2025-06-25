@@ -604,5 +604,7 @@ with demo:
   slider.change(update_color_blocks, inputs=[color, slider], outputs=output)
   split_btn.click(fn=lambda val, objfile: handle_upload(val, 'mp3', objfile), inputs=[audio_input, customobj], outputs=output_download)
   yt_btn.click(fn=lambda val2, objfile: handle_upload(val2, 'link', objfile), inputs=[yt_input, customobj], outputs=output_download)
-
-demo.launch(debug=True)
+try:
+  demo.launch(share=True)
+except:
+  demo.launch()
